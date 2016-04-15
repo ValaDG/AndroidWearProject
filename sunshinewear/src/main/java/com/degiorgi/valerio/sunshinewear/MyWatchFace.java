@@ -88,6 +88,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
         Paint mTextPaint;
+        Paint mSmallTextPaint;
         boolean mAmbient;
         Time mTime;
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
@@ -126,6 +127,9 @@ public class MyWatchFace extends CanvasWatchFaceService {
 
             mTextPaint = new Paint();
             mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
+
+            mSmallTextPaint = new Paint();
+            mSmallTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
 
             mTime = new Time();
         }
@@ -193,6 +197,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
                     ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
 
             mTextPaint.setTextSize(textSize);
+            mSmallTextPaint.setTextSize(textSize - 40);
         }
 
         @Override
@@ -258,10 +263,18 @@ public class MyWatchFace extends CanvasWatchFaceService {
 
             // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
             mTime.setToNow();
-            String text = mAmbient
-                    ? String.format("%d:%02d", mTime.hour, mTime.minute)
-                    : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
-            canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
+            String text = String.format("%d:%02d", mTime.hour, mTime.minute);
+
+
+            String day = String.format("%ta", mTime.toMillis(false));
+            String dayNumber = String.format("%02d", mTime.monthDay);
+            String month = String.format("%02d", mTime.month);
+            String year = String.format("%02d", mTime.year);
+
+            String date = day + ", " + dayNumber + " " + month + " " + year;
+            canvas.drawText(text, mXOffset + 20, mYOffset - 20, mTextPaint);
+            canvas.drawText(date, mXOffset + 20, mYOffset + 20, mSmallTextPaint);
+
         }
 
         /**
