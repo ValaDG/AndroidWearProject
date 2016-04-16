@@ -38,11 +38,11 @@ import com.google.android.gms.common.GoogleApiAvailability;
 
 public class MainActivity extends AppCompatActivity implements ForecastFragment.Callback {
 
-    private final String LOG_TAG = MainActivity.class.getSimpleName();
+
+    public static final String SENT_TOKEN_TO_SERVER = "sentTokenToServer";
     private static final String DETAILFRAGMENT_TAG = "DFTAG";
     private final static int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
-    public static final String SENT_TOKEN_TO_SERVER = "sentTokenToServer";
-
+    private final String LOG_TAG = MainActivity.class.getSimpleName();
     private boolean mTwoPane;
     private String mLocation;
 
@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity implements ForecastFragment.
         Uri contentUri = getIntent() != null ? getIntent().getData() : null;
 
         setContentView(R.layout.activity_main);
+
         Toolbar toolbar = (Toolbar)findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -107,6 +108,8 @@ public class MainActivity extends AppCompatActivity implements ForecastFragment.
                 startService(intent);
             }
         }
+
+
     }
 
     @Override
@@ -149,6 +152,7 @@ public class MainActivity extends AppCompatActivity implements ForecastFragment.
             mLocation = location;
         }
     }
+
 
     @Override
     public void onItemSelected(Uri contentUri, ForecastAdapter.ForecastAdapterViewHolder vh) {
@@ -196,4 +200,5 @@ public class MainActivity extends AppCompatActivity implements ForecastFragment.
         }
         return true;
     }
+
 }

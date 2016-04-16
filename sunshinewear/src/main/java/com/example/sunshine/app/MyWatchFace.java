@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.degiorgi.valerio.sunshinewear;
+package com.example.sunshine.app;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -32,8 +32,20 @@ import android.os.Message;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
+
+import com.example.android.sunshine.app.R;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.Wearable;
 
 import java.lang.ref.WeakReference;
 import java.util.TimeZone;
@@ -57,6 +69,14 @@ public class MyWatchFace extends CanvasWatchFaceService {
      * Handler message id for updating the time periodically in interactive mode.
      */
     private static final int MSG_UPDATE_TIME = 0;
+    private static final String TAG = "WatchFace";
+
+
+    String maxTemp;
+    String minTemp;
+
+    GoogleApiClient mGoogleApiClient;
+
 
     @Override
     public Engine onCreateEngine() {
@@ -83,7 +103,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
         }
     }
 
-    private class Engine extends CanvasWatchFaceService.Engine {
+
+    private class Engine extends CanvasWatchFaceService.Engine implements DataApi.DataListener {
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
@@ -112,6 +133,32 @@ public class MyWatchFace extends CanvasWatchFaceService {
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
+
+            mGoogleApiClient = new GoogleApiClient.Builder(getApplicationContext())
+                    .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
+                        @Override
+                        public void onConnected(Bundle connectionHint) {
+                            Log.d(TAG, "onConnected: " + connectionHint);
+
+                            Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
+
+                        }
+
+                        @Override
+                        public void onConnectionSuspended(int cause) {
+                            Log.d(TAG, "onConnectionSuspended: " + cause);
+                        }
+                    })
+                    .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
+                        @Override
+                        public void onConnectionFailed(ConnectionResult result) {
+                            Log.d(TAG, "onConnectionFailed: " + result);
+                        }
+                    })
+                    // Request access only to the Wearable API
+                    .addApi(Wearable.API)
+                    .build();
+
 
             setWatchFaceStyle(new WatchFaceStyle.Builder(MyWatchFace.this)
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_VARIABLE)
@@ -154,18 +201,25 @@ public class MyWatchFace extends CanvasWatchFaceService {
 
             if (visible) {
                 registerReceiver();
+                mGoogleApiClient.connect();
 
                 // Update time zone in case it changed while we weren't visible.
                 mTime.clear(TimeZone.getDefault().getID());
                 mTime.setToNow();
             } else {
                 unregisterReceiver();
-            }
 
-            // Whether the timer should be running depends on whether we're visible (as well as
-            // whether we're in ambient mode), so we may need to start or stop the timer.
-            updateTimer();
+                if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+                    Wearable.DataApi.removeListener(mGoogleApiClient, this);
+                    mGoogleApiClient.disconnect();
+                }
+
+                // Whether the timer should be running depends on whether we're visible (as well as
+                // whether we're in ambient mode), so we may need to start or stop the timer.
+                updateTimer();
+            }
         }
+
 
         private void registerReceiver() {
             if (mRegisteredTimeZoneReceiver) {
@@ -270,10 +324,12 @@ public class MyWatchFace extends CanvasWatchFaceService {
             String dayNumber = String.format("%02d", mTime.monthDay);
             String month = String.format("%02d", mTime.month);
             String year = String.format("%02d", mTime.year);
+            String mTemp = String.format("%02d", minTemp);
 
             String date = day + ", " + dayNumber + " " + month + " " + year;
             canvas.drawText(text, mXOffset + 20, mYOffset - 20, mTextPaint);
             canvas.drawText(date, mXOffset + 20, mYOffset + 20, mSmallTextPaint);
+            canvas.drawText(mTemp, mXOffset, mYOffset, mSmallTextPaint);
 
         }
 
@@ -308,5 +364,30 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
         }
+
+        @Override
+        public void onDataChanged(DataEventBuffer dataEvents) {
+
+            Log.d(TAG, "onDataChanged");
+            for (DataEvent dataEvent : dataEvents) {
+                if (dataEvent.getType() != DataEvent.TYPE_CHANGED) {
+                    continue;
+                }
+
+                DataItem dataItem = dataEvent.getDataItem();
+                if (!dataItem.getUri().getPath().equals(
+                        "/watch_data")) {
+                    continue;
+                }
+
+                DataMapItem dataMapItem = DataMapItem.fromDataItem(dataItem);
+                DataMap dMap = dataMapItem.getDataMap();
+
+                minTemp = dMap.getString("minTemp");
+                maxTemp = dMap.getString("maxTemp");
+                invalidate();
+            }
+        }
     }
+
 }
