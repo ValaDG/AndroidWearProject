@@ -512,8 +512,8 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                         dataMapRequest.getDataMap().putString("minTemp", data[1]);
                         dataMapRequest.getDataMap().putString("maxTemp", data[2]);
                         dataMapRequest.getDataMap().putString("imageId",data[0]);
-                        dataMapRequest.setUrgent();
                         PutDataRequest request = dataMapRequest.asPutDataRequest();
+                        request.setUrgent();
                         Wearable.DataApi.putDataItem(mGoogleApiClient, request).setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
                             @Override
                             public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
