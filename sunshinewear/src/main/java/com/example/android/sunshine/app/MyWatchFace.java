@@ -21,6 +21,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -38,10 +40,12 @@ import android.view.WindowInsets;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.DataItemBuffer;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.Wearable;
@@ -71,8 +75,11 @@ public class MyWatchFace extends CanvasWatchFaceService {
     private static final String TAG = "WatchFace";
 
 
-    String maxTemp;
-    String minTemp;
+    int maxTemp;
+    int minTemp;
+    long mWeatherId;
+    String mIcon;
+    Bitmap mIconBitmap;
 
     GoogleApiClient mGoogleApiClient;
 
@@ -133,6 +140,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
 
+            minTemp = 1;
+
             mGoogleApiClient = new GoogleApiClient.Builder(getApplicationContext())
                     .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
                         @Override
@@ -140,6 +149,39 @@ public class MyWatchFace extends CanvasWatchFaceService {
                             Log.d(TAG, "onConnected: " + connectionHint);
 
                             Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
+                            Wearable.DataApi.getDataItems(mGoogleApiClient).setResultCallback(new ResultCallback<DataItemBuffer>() {
+                                @Override
+                                public void onResult(DataItemBuffer dataItems) {
+                                    if (dataItems.getStatus().isSuccess()) {
+                                        Log.d("WatchService", "DataItem stored Successfully");
+                                    } else {
+                                        Log.d("WatchSercvice", "DataItem not stored");
+                                    }
+
+                                    for (DataItem item : dataItems) {
+
+                                        if ("/watch_data".equals(item.getUri().getPath())) {
+
+                                            DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
+
+                                            if (dataMap.containsKey("minTemp")) {
+                                                minTemp = Math.round(Float.valueOf(dataMap.getString("minTemp")));
+                                            }
+                                            if (dataMap.containsKey("maxTemp")) {
+                                                maxTemp = Math.round(Float.valueOf(dataMap.getString("maxTemp")));
+                                            }
+                                            if (dataMap.containsKey("imageId")) {
+                                                mWeatherId = Long.valueOf(dataMap.getString("imageId"));
+                                                mIcon = WeatherIDDecoder.getArtForWeatherCondition(mWeatherId);
+                                            }
+
+                                        }
+                                    }
+                                    invalidate();
+                                    dataItems.release();
+                                }
+                            });
+
 
                         }
 
@@ -314,21 +356,30 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 canvas.drawRect(0, 0, bounds.width(), bounds.height(), mBackgroundPaint);
             }
 
+            if (mIcon == null) {
+                mIcon = "clear";
+            }
+
+            int resId = getResources().getIdentifier("ic_" + mIcon, "drawable", getPackageName());
+
+            mIconBitmap = BitmapFactory.decodeResource(getResources(), resId);
+
             // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
             mTime.setToNow();
             String text = String.format("%d:%02d", mTime.hour, mTime.minute);
-
-
             String day = String.format("%ta", mTime.toMillis(false));
             String dayNumber = String.format("%02d", mTime.monthDay);
             String month = String.format("%02d", mTime.month);
             String year = String.format("%02d", mTime.year);
-            String mTemp = String.format("%02d", minTemp);
+            String miTemp = String.format("%02d", minTemp);
+            String maTemp = String.format("%02d", maxTemp);
 
             String date = day + ", " + dayNumber + " " + month + " " + year;
-            canvas.drawText(text, mXOffset + 20, mYOffset - 20, mTextPaint);
+            canvas.drawText(text, mXOffset + 40, mYOffset - 20, mTextPaint);
             canvas.drawText(date, mXOffset + 20, mYOffset + 20, mSmallTextPaint);
-            canvas.drawText(mTemp, mXOffset, mYOffset, mSmallTextPaint);
+            canvas.drawText(miTemp, mXOffset + 110, mYOffset + 70, mSmallTextPaint);
+            canvas.drawText(maTemp, mXOffset + 150, mYOffset + 70, mSmallTextPaint);
+            canvas.drawBitmap(mIconBitmap, mXOffset + 35, mYOffset + 20, mSmallTextPaint);
 
         }
 
@@ -382,10 +433,20 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 DataMapItem dataMapItem = DataMapItem.fromDataItem(dataItem);
                 DataMap dMap = dataMapItem.getDataMap();
 
-                minTemp = dMap.getString("minTemp");
-                maxTemp = dMap.getString("maxTemp");
+                if (dMap.containsKey("minTemp")) {
+                    minTemp = Math.round(Float.valueOf(dMap.getString("minTemp")));
+                }
+                if (dMap.containsKey("maxTemp")) {
+                    maxTemp = Math.round(Float.valueOf(dMap.getString("maxTemp")));
+                }
+                if (dMap.containsKey("imageId")) {
+                    mWeatherId = Long.valueOf(dMap.getString("imageId"));
+                    mIcon = WeatherIDDecoder.getArtForWeatherCondition(mWeatherId);
+                }
                 invalidate();
             }
+
+            dataEvents.release();
         }
     }
 
